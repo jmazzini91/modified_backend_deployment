@@ -59,8 +59,7 @@ class TradingRecommendationEngine:
             asset_list = [a for a in assets if a in self.supported_assets]
         else:
             # Use a subset of assets if none specified
-            asset_list = list(self.supported_assets.keys())[:8]  # Limit to 8 for performance
-        
+            asset_list = list(self.supported_assets.keys())  # Process all supported assets        
         # Get recommendations for each asset
         recommendations = []
         for symbol in asset_list:
