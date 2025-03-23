@@ -1,6 +1,4 @@
 import os
-import sys
-sys.path.append('/opt/.manus/.sandbox-runtime')
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import json

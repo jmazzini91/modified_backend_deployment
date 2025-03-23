@@ -1,130 +1,113 @@
-import sys
-sys.path.append('/opt/.manus/.sandbox-runtime')
-from data_api import ApiClient
-import json
-from datetime import datetime
 from data_fetcher import DataFetcher
+import random
+from datetime import datetime, timedelta
 
 class TradingRecommendationEngine:
     def __init__(self):
+        """Initialize the trading recommendation engine"""
         self.data_fetcher = DataFetcher()
-        self.supported_assets = {
-            "stocks": ["AAPL", "MSFT", "AMZN", "GOOGL", "META"],
-            "forex": ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"],
-            "crypto": ["BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD"],
-            "commodities": ["GC=F", "SI=F", "CL=F", "NG=F"]
-        }
         
+        # Define supported assets with their types
+        self.supported_assets = {
+            # Stocks
+            "AAPL": {"name": "Apple Inc.", "type": "stock"},
+            "MSFT": {"name": "Microsoft Corporation", "type": "stock"},
+            "AMZN": {"name": "Amazon.com Inc.", "type": "stock"},
+            "GOOGL": {"name": "Alphabet Inc.", "type": "stock"},
+            "META": {"name": "Meta Platforms Inc.", "type": "stock"},
+            "TSLA": {"name": "Tesla Inc.", "type": "stock"},
+            "NVDA": {"name": "NVIDIA Corporation", "type": "stock"},
+            
+            # Forex
+            "EURUSD=X": {"name": "EUR/USD", "type": "forex"},
+            "GBPUSD=X": {"name": "GBP/USD", "type": "forex"},
+            "USDJPY=X": {"name": "USD/JPY", "type": "forex"},
+            "AUDUSD=X": {"name": "AUD/USD", "type": "forex"},
+            
+            # Cryptocurrencies
+            "BTC-USD": {"name": "Bitcoin USD", "type": "crypto"},
+            "ETH-USD": {"name": "Ethereum USD", "type": "crypto"},
+            "XRP-USD": {"name": "Ripple USD", "type": "crypto"},
+            "SOL-USD": {"name": "Solana USD", "type": "crypto"},
+            
+            # Commodities
+            "GC=F": {"name": "Gold", "type": "commodity"},
+            "SI=F": {"name": "Silver", "type": "commodity"},
+            "CL=F": {"name": "Crude Oil", "type": "commodity"},
+            "NG=F": {"name": "Natural Gas", "type": "commodity"}
+        }
+    
     def get_recommendations(self, timeframe="24h", assets=None):
         """
-        Generate trading recommendations for specified assets and timeframe
+        Get trading recommendations for specified assets and timeframe
         
         Args:
             timeframe (str): Timeframe for analysis (12h, 24h, 3d, 1w)
-            assets (list): List of specific assets to analyze, or None for default selection
-            
+            assets (list): List of asset symbols to get recommendations for
+                          If None, returns recommendations for all supported assets
+        
         Returns:
-            dict: Trading recommendations for each asset
+            dict: Trading recommendations with metadata
         """
+        # Validate timeframe
         if timeframe not in ["12h", "24h", "3d", "1w"]:
-            timeframe = "24h"  # Default to 24h if invalid timeframe
+            timeframe = "24h"  # Default to 24h if invalid
         
-        # If no specific assets requested, use a default selection
-        if not assets:
-            assets = self._get_default_assets()
+        # Determine which assets to analyze
+        if assets:
+            # Filter to only include supported assets
+            asset_list = [a for a in assets if a in self.supported_assets]
+        else:
+            # Use a subset of assets if none specified
+            asset_list = list(self.supported_assets.keys())[:8]  # Limit to 8 for performance
         
-        recommendations = {}
-        for asset in assets:
-            asset_type = self._determine_asset_type(asset)
-            if not asset_type:
-                continue  # Skip unsupported assets
-                
-            # Fetch data and generate recommendation
-            asset_data = self.data_fetcher.get_stock_data(asset, timeframe)
+        # Get recommendations for each asset
+        recommendations = []
+        for symbol in asset_list:
+            # Get data for this asset
+            asset_data = self.data_fetcher.get_stock_data(symbol, timeframe)
+            
             if asset_data:
-                recommendations[asset] = {
-                    "symbol": asset,
-                    "name": self._get_asset_name(asset),
-                    "type": asset_type,
+                # Create recommendation object
+                recommendation = {
+                    "symbol": symbol,
+                    "name": self._get_asset_name(symbol),
+                    "type": self._get_asset_type(symbol),
                     "price": asset_data["price"],
                     "currency": asset_data["currency"],
                     "recommendation": asset_data["recommendation"],
-                    "potential": round(asset_data["potential"], 2),
-                    "entry_price": asset_data["price"],
+                    "confidence": asset_data["confidence"],
+                    "entry": asset_data["price"],  # Current price is entry point
                     "stop_loss": asset_data["stop_loss"],
                     "take_profit": asset_data["take_profit"],
-                    "confidence": asset_data["confidence"],
+                    "potential": round(asset_data["potential"], 2),
                     "expiration": asset_data["expiration"],
                     "timeframe": timeframe
                 }
+                recommendations.append(recommendation)
         
-        # Sort recommendations by potential (descending)
-        sorted_recommendations = dict(sorted(
-            recommendations.items(), 
-            key=lambda item: abs(item[1]["potential"]), 
-            reverse=True
+        # Sort recommendations by confidence and potential
+        recommendations.sort(key=lambda x: (
+            0 if x["confidence"] == "High" else (1 if x["confidence"] == "Medium" else 2),
+            -x["potential"]
         ))
         
+        # Return recommendations with metadata
         return {
             "timestamp": datetime.now().strftime("%I:%M %p %m/%d/%Y"),
             "timeframe": timeframe,
-            "recommendations": sorted_recommendations
+            "count": len(recommendations),
+            "recommendations": recommendations
         }
-    
-    def _get_default_assets(self):
-        """Get a default selection of assets across different types"""
-        default_assets = []
-        default_assets.extend(self.supported_assets["stocks"][:2])  # Top 2 stocks
-        default_assets.extend(self.supported_assets["forex"][:1])   # Top 1 forex
-        default_assets.extend(self.supported_assets["crypto"][:1])  # Top 1 crypto
-        default_assets.extend(self.supported_assets["commodities"][:1])  # Top 1 commodity
-        return default_assets
-    
-    def _determine_asset_type(self, symbol):
-        """Determine the type of asset based on symbol"""
-        if symbol in self.supported_assets["stocks"]:
-            return "Stock"
-        elif symbol in self.supported_assets["forex"]:
-            return "Forex"
-        elif symbol in self.supported_assets["crypto"]:
-            return "Crypto"
-        elif symbol in self.supported_assets["commodities"]:
-            return "Commodity"
-        return None
     
     def _get_asset_name(self, symbol):
-        """Get full name for an asset symbol"""
-        asset_names = {
-            # Stocks
-            "AAPL": "Apple Inc.",
-            "MSFT": "Microsoft Corporation",
-            "AMZN": "Amazon.com Inc.",
-            "GOOGL": "Alphabet Inc.",
-            "META": "Meta Platforms Inc.",
-            
-            # Forex
-            "EURUSD=X": "Euro / US Dollar",
-            "GBPUSD=X": "British Pound / US Dollar",
-            "USDJPY=X": "US Dollar / Japanese Yen",
-            "AUDUSD=X": "Australian Dollar / US Dollar",
-            
-            # Crypto
-            "BTC-USD": "Bitcoin / US Dollar",
-            "ETH-USD": "Ethereum / US Dollar",
-            "XRP-USD": "Ripple / US Dollar",
-            "SOL-USD": "Solana / US Dollar",
-            
-            # Commodities
-            "GC=F": "Gold",
-            "SI=F": "Silver",
-            "CL=F": "Crude Oil",
-            "NG=F": "Natural Gas"
-        }
-        
-        return asset_names.get(symbol, symbol)
-
-# Test the recommendation engine
-if __name__ == "__main__":
-    engine = TradingRecommendationEngine()
-    recommendations = engine.get_recommendations("24h")
-    print(json.dumps(recommendations, indent=2))
+        """Get the display name for an asset symbol"""
+        if symbol in self.supported_assets:
+            return self.supported_assets[symbol]["name"]
+        return symbol
+    
+    def _get_asset_type(self, symbol):
+        """Get the asset type for a symbol"""
+        if symbol in self.supported_assets:
+            return self.supported_assets[symbol]["type"]
+        return "unknown"

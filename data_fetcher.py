@@ -1,13 +1,12 @@
-import sys
-sys.path.append('/opt/.manus/.sandbox-runtime')
-from data_api import ApiClient
 import json
 import time
 from datetime import datetime, timedelta
+import requests  # Standard library for HTTP requests
 
 class DataFetcher:
     def __init__(self):
-        self.client = ApiClient()
+        # No API client needed, using standard requests library
+        pass
         
     def get_stock_data(self, symbol, timeframe):
         """
@@ -32,19 +31,19 @@ class DataFetcher:
         range_val = interval_map[timeframe]["range"]
         
         try:
-            # Get stock chart data
-            chart_data = self.client.call_api('YahooFinance/get_stock_chart', query={
-                'symbol': symbol,
-                'interval': interval,
-                'range': range_val,
-                'includePrePost': True,
-                'includeAdjustedClose': True
+            # Get stock chart data using standard requests
+            chart_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval={interval}&range={range_val}&includePrePost=true"
+            chart_response = requests.get(chart_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             })
+            chart_data = chart_response.json()
             
             # Get stock insights for technical indicators
-            insights_data = self.client.call_api('YahooFinance/get_stock_insights', query={
-                'symbol': symbol
+            insights_url = f"https://query1.finance.yahoo.com/v1/finance/insights?symbol={symbol}"
+            insights_response = requests.get(insights_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             })
+            insights_data = insights_response.json()
             
             # Process and combine data
             processed_data = self._process_stock_data(chart_data, insights_data, timeframe)
@@ -88,8 +87,8 @@ class DataFetcher:
             # Determine support and resistance levels
             support = 0
             resistance = 0
-            if 'keyTechnicals' in insights_data.get('finance', {}).get('result', {}).get('instrumentInfo', {}):
-                key_tech = insights_data['finance']['result']['instrumentInfo']['keyTechnicals']
+            if insights_data and 'finance' in insights_data and 'result' in insights_data.get('finance', {}) and 'instrumentInfo' in insights_data['finance']['result']:
+                key_tech = insights_data['finance']['result']['instrumentInfo'].get('keyTechnicals', {})
                 support = key_tech.get('support', current_price * 0.95)
                 resistance = key_tech.get('resistance', current_price * 1.05)
             else:
@@ -312,11 +311,3 @@ class DataFetcher:
             expiration = now + timedelta(hours=24)  # Default
         
         return expiration.strftime("%I:%M %p %m/%d/%Y")
-
-# Test the data fetcher
-if __name__ == "__main__":
-    fetcher = DataFetcher()
-    
-    # Test with Apple stock
-    apple_data = fetcher.get_stock_data("AAPL", "24h")
-    print(json.dumps(apple_data, indent=2))
