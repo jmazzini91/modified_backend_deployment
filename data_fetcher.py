@@ -287,9 +287,9 @@ class DataFetcher:
         rsi = indicators.get("rsi", 50)
         macd = indicators.get("macd", 0)
         
-        if rsi < 30 and macd > 0:
+        if rsi < 40 and macd > 0:
             return "BUY"
-        elif rsi > 70 and macd < 0:
+        elif rsi > 60 and macd < 0:
             return "SELL"
         
         # Default to trend
