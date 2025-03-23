@@ -245,7 +245,7 @@ class DataFetcher:
         
         # Check if RSI indicates overbought/oversold
         rsi = indicators.get("rsi", 50)
-        if (trend == "bullish" and rsi < 40) or (trend == "bearish" and rsi > 60):
+    if (trend == "bullish" and rsi < 40) or (trend == "bearish" and rsi > 60):
     confidence_score += 1
         
         # Check if price is above/below moving averages
